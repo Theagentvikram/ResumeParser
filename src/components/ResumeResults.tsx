@@ -9,7 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Resume } from "@/types";
-import { API_BASE_URL } from "@/config/api";
 
 export function ResumeResults() {
   const { searchResults, isSearching, searchQuery } = useResumes();
@@ -140,9 +139,7 @@ export function ResumeResults() {
       <Dialog open={!!selectedResume} onOpenChange={(open) => !open && setSelectedResume(null)}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>
-              {selectedResume ? (selectedResume.originalName || selectedResume.filename || "Resume").replace(".pdf", "") : "Resume Details"}
-            </DialogTitle>
+            <DialogTitle>{selectedResume?.originalName.replace(".pdf", "")}</DialogTitle>
             <DialogDescription>
               Complete resume details and information
             </DialogDescription>
@@ -152,49 +149,41 @@ export function ResumeResults() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium mb-1">Summary</h3>
-                <p className="text-sm">{selectedResume.summary || "No summary available"}</p>
+                <p className="text-sm">{selectedResume.summary}</p>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-sm font-medium mb-1">Category</h3>
-                  <p className="text-sm">{selectedResume.category || "Not specified"}</p>
+                  <p className="text-sm">{selectedResume.category}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium mb-1">Experience</h3>
-                  <p className="text-sm">{selectedResume.experience ? `${selectedResume.experience} years` : "Not specified"}</p>
+                  <p className="text-sm">{selectedResume.experience} years</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium mb-1">Education</h3>
-                  <p className="text-sm">{selectedResume.educationLevel || "Not specified"}</p>
+                  <p className="text-sm">{selectedResume.educationLevel}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium mb-1">Uploaded</h3>
-                  <p className="text-sm">{selectedResume.uploadDate ? formatDate(selectedResume.uploadDate) : "Unknown date"}</p>
+                  <p className="text-sm">{formatDate(selectedResume.uploadDate)}</p>
                 </div>
               </div>
               
               <div>
                 <h3 className="text-sm font-medium mb-1">Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {selectedResume.skills && selectedResume.skills.length > 0 ? (
-                    selectedResume.skills.map((skill) => (
-                      <Badge key={skill} variant="outline">
-                        {skill}
-                      </Badge>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No skills listed</p>
-                  )}
+                  {selectedResume.skills.map((skill) => (
+                    <Badge key={skill} variant="outline">
+                      {skill}
+                    </Badge>
+                  ))}
                 </div>
               </div>
               
               <div className="pt-2 flex justify-end">
-                <Button onClick={() => {
-                  const downloadUrl = `${API_BASE_URL}/resumes/download/${selectedResume.id}`;
-                  console.log("Downloading resume from:", downloadUrl);
-                  window.open(downloadUrl, "_blank");
-                }}>
+                <Button>
                   <Download className="h-4 w-4 mr-2" /> Download Resume
                 </Button>
               </div>

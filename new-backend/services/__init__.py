@@ -1,3 +1,0 @@
-"""
-Services initialization module
-"""

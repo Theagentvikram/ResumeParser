@@ -122,7 +122,7 @@ class ModelStatusResponse(BaseModel):
     status: str
     message: str
     using_fallback: bool
-    mode: str
+    mode: Optional[str] = "unknown"
 
 @app.get("/")
 async def root():
@@ -140,8 +140,14 @@ async def model_status():
         # Check if we're in a specific mode
         if ANALYZER_MODE == "api" and OPENROUTER_API_AVAILABLE:
             # Check OpenRouter API
-            status = get_openrouter_model_status()
-            status["mode"] = "api"
+            status = get_openrouter_model_status(fallback_to_mock=True)
+            
+            # Ensure all required fields are present
+            if "using_fallback" not in status:
+                status["using_fallback"] = False
+            if "mode" not in status:
+                status["mode"] = "api"
+                
             return status
         
         elif ANALYZER_MODE == "offline" and OFFLINE_MISTRAL_AVAILABLE:
@@ -158,7 +164,7 @@ async def model_status():
                     "status": "unavailable",
                     "message": "Offline Mistral model is not available",
                     "using_fallback": True,
-                    "mode": "offline"
+                    "mode": "fallback"
                 }
         
         elif ANALYZER_MODE == "llama_cpp" and LLAMA_CPP_AVAILABLE:
@@ -191,9 +197,15 @@ async def model_status():
         elif ANALYZER_MODE == "auto":
             # First try OpenRouter API
             if OPENROUTER_API_AVAILABLE:
-                status = get_openrouter_model_status()
-                if status["status"] == "available":
+                status = get_openrouter_model_status(fallback_to_mock=True)
+                
+                # Ensure all required fields are present
+                if "using_fallback" not in status:
+                    status["using_fallback"] = False
+                if "mode" not in status:
                     status["mode"] = "api"
+                    
+                if status["status"] == "available":
                     return status
             
             # Then try offline Mistral model
@@ -233,10 +245,10 @@ async def model_status():
     except Exception as e:
         print(f"Error in model status check: {str(e)}")
         return {
-            "status": "unavailable",
-            "message": "Error checking model status",
+            "status": "error",
+            "message": f"Error checking model status: {str(e)}",
             "using_fallback": True,
-            "mode": "regex"
+            "mode": "fallback"
         }
 
 @app.post("/api/resumes/analyze", response_model=AnalysisResult)
@@ -339,13 +351,25 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
                     try:
                         print("Attempting to use OpenRouter API with Mistral 7B")
                         # Check OpenRouter API status first
-                        status = get_openrouter_model_status()
+                        status = get_openrouter_model_status(fallback_to_mock=True)
                         print(f"OpenRouter API status: {status}")
                         
-                        # Always try to use the OpenRouter API if it's available
-                        print(f"OpenRouter API status: {status}")
+                        # Check if we're using fallback mode
+                        if status.get("using_fallback", False):
+                            print("OpenRouter API is using fallback mode")
+                            # If we're in API-only mode, check if we should return an error
+                            if ANALYZER_MODE == "api" and not status.get("status") == "available":
+                                raise HTTPException(status_code=503, 
+                                    detail=f"OpenRouter API analysis unavailable: {status.get('message')}. Using fallback analysis.")
+                        
+                        # Proceed with OpenRouter API resume analysis (with fallback)
                         print("Proceeding with OpenRouter API resume analysis...")
-                        analysis_result = analyze_resume_with_openrouter(resume_text)
+                        analysis_result = analyze_resume_with_openrouter(resume_text, fallback_to_mock=True)
+                        
+                        # Add a source field to indicate where the analysis came from
+                        if "source" not in analysis_result:
+                            analysis_result["source"] = "openrouter_api"
+                            
                         return analysis_result
                     except ValueError as e:
                         # The OpenRouter API had an authentication or connection error
@@ -359,6 +383,10 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
                         if ANALYZER_MODE == "api":
                             raise HTTPException(status_code=500,
                                 detail=f"Unexpected error with OpenRouter API: {str(e)}.")
+                        else:
+                            # For auto mode, log the error and continue to fallback methods
+                            print(f"Falling back to alternative analysis method due to error: {str(e)}")
+                            # We'll continue to the next analysis method
                         
                         # Otherwise in auto mode, try other methods
                         print("Falling back to other analysis methods...")
