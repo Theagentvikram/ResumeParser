@@ -1,0 +1,19 @@
+
+John Doe
+Software Engineer
+
+EXPERIENCE:
+Senior Software Engineer, ABC Tech (2018-Present)
+- Developed and maintained cloud-based applications using Python and AWS
+- Led a team of 5 developers on a major project
+
+Software Developer, XYZ Solutions (2015-2018)
+- Built web applications using React and Node.js
+- Implemented CI/CD pipelines
+
+EDUCATION:
+Master of Computer Science, Stanford University (2015)
+Bachelor of Engineering, MIT (2013)
+
+SKILLS:
+Python, JavaScript, React, Node.js, AWS, Docker, Kubernetes, CI/CD
