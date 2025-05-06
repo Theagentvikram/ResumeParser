@@ -9,13 +9,13 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:80
 export const API_ENDPOINTS = {
   // Resume endpoints
   RESUME: {
-    ANALYZE: `${API_BASE_URL}/resumes/analyze`,
-    UPLOAD: `${API_BASE_URL}/resumes/upload`,
-    UPLOAD_BULK: `${API_BASE_URL}/resumes/upload-bulk`,
-    GET_ALL: `${API_BASE_URL}/resumes`,
-    SEARCH: `${API_BASE_URL}/resumes/search`,
-    DOWNLOAD: (id: string) => `${API_BASE_URL}/resumes/download/${id}`,
-    GET_SKILLS: `${API_BASE_URL}/skills`,
+    ANALYZE: `${API_BASE_URL}/api/resumes/analyze`,
+    UPLOAD: `${API_BASE_URL}/api/resumes/upload`,
+    UPLOAD_BULK: `${API_BASE_URL}/api/resumes/upload-bulk`,
+    GET_ALL: `${API_BASE_URL}/api/resumes/user`,
+    SEARCH: `${API_BASE_URL}/api/resumes/search`,
+    DOWNLOAD: (id: string) => `${API_BASE_URL}/api/resumes/download/${id}`,
+    GET_SKILLS: `${API_BASE_URL}/api/skills`,
   },
   
   // Auth endpoints (for future use)

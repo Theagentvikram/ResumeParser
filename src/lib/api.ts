@@ -2,7 +2,7 @@ import { User, Resume, SearchResult } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { mockUsers, mockResumes } from "./mockData";
 import axios from 'axios';
-import { API_ENDPOINTS, getDownloadUrl } from "@/config/api";
+import { API_ENDPOINTS, API_BASE_URL, getDownloadUrl } from "@/config/api";
 
 // Local storage keys
 const TOKEN_KEY = "resumatch_token";
@@ -324,13 +324,16 @@ export const analyzeResume = async (input: string | File): Promise<{
       // Text input - attempt to analyze using backend
       try {
         console.log("Sending text analysis request to:", API_ENDPOINTS.RESUME.ANALYZE);
-        const response = await axios.post(API_ENDPOINTS.RESUME.ANALYZE, { text: input }, {
-          headers: { 'Content-Type': 'application/json' }
-        });
+        // Send a simple JSON request with the text
+        const response = await axios.post(
+          API_ENDPOINTS.RESUME.ANALYZE, 
+          { text: input },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
         console.log("Text analysis response:", response.status);
         return response.data;
       } catch (error) {
-        console.warn("Backend text analysis failed, using enhanced mock data", error);
+        console.warn("Backend text analysis failed", error);
         if (axios.isAxiosError(error)) {
           console.error("API error details:", {
             status: error.response?.status,
@@ -338,7 +341,14 @@ export const analyzeResume = async (input: string | File): Promise<{
             data: error.response?.data
           });
         }
-        return enhancedAnalysis(input);
+        // Return error in the summary rather than using mock data
+        return {
+          skills: ["Error occurred"],
+          experience: 0,
+          educationLevel: "Unknown",
+          summary: `Error analyzing resume text: ${error instanceof Error ? error.message : "Unknown error"}. Please try again or contact support if the issue persists.`,
+          category: "Unknown"
+        };
       }
     } else {
       // File input
@@ -815,14 +825,20 @@ export async function analyzeUserResume(file: File) {
       fileSize: file.size
     });
     
+    // Add detailed logging for debugging
+    console.log("API Base URL:", API_BASE_URL);
+    console.log("Full API Endpoint:", API_ENDPOINTS.RESUME.ANALYZE);
+    
+    // Set longer timeout for PDF processing
     const response = await axios.post(API_ENDPOINTS.RESUME.ANALYZE, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
-      timeout: 60000 // 60 seconds timeout for file processing
+      timeout: 120000 // 120 seconds timeout for file processing
     });
     
-    console.log("Analysis response:", response.status, response.data);
+    console.log("Analysis response status:", response.status);
+    console.log("Analysis response data:", JSON.stringify(response.data, null, 2));
     
     if (response.status >= 200 && response.status < 300 && response.data) {
       // If we have a valid response with data, use it
@@ -961,33 +977,47 @@ export async function searchUserResumes(query: string, filters = {}) {
  */
 export async function getModelStatus(): Promise<{ status: string; message: string; mode: string; using_fallback: boolean }> {
   try {
-    const response = await fetch('/api/model/status', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    console.log(`Sending model status request to: ${API_BASE_URL}/api/model/status`);
+    const response = await axios.get(`${API_BASE_URL}/api/model/status`);
 
-    if (!response.ok) {
+    console.log('Model status response:', response.status, response.statusText);
+    console.log('Model status data:', response.data);
+    
+    if (response.status !== 200) {
       console.error('Error fetching model status:', response.status, response.statusText);
       // Return a default fallback status
       return {
         status: 'unavailable',
         message: 'Could not connect to the analysis service',
         using_fallback: true,
-        mode: 'regex'
+        mode: 'pattern'
       };
     }
 
-    return await response.json();
+    return response.data;
   } catch (error) {
     console.error('Failed to fetch model status:', error);
+    
+    // Add more detailed error logging
+    if (axios.isAxiosError(error)) {
+      console.error("API error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
+    }
+    
     // Return a default fallback status for network errors
     return {
       status: 'unavailable',
       message: 'Could not connect to the analysis service',
       using_fallback: true,
-      mode: 'regex'
+      mode: 'pattern'
     };
   }
 }

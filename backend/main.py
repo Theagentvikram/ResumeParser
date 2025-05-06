@@ -239,8 +239,8 @@ async def model_status():
             "mode": "regex"
         }
 
-@app.post("/resumes/analyze", response_model=AnalysisResult)
-async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional[Dict[str, Any]] = Body(None)):
+@app.post("/api/resumes/analyze", response_model=AnalysisResult)
+async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional[Any] = Body(None)):
     """
     Analyze a resume file or text and extract key information
     """
@@ -257,9 +257,16 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
             if isinstance(text, dict) and "text" in text:
                 resume_text = text["text"]
                 print(f"Extracted text from JSON: {resume_text[:100]}...")
+            elif isinstance(text, str):
+                resume_text = text
+                print(f"Using text as string: {resume_text[:100]}...")
             else:
                 resume_text = str(text)
-                print(f"Using text as string: {resume_text[:100]}...")
+                print(f"Converted to string: {resume_text[:100]}...")
+            
+            # Ensure we have meaningful text
+            if not resume_text or len(resume_text.strip()) < 20:
+                raise HTTPException(status_code=400, detail="Text input is too short or empty")
         
         # Handle file upload
         elif file:
@@ -331,6 +338,13 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
                 if ANALYZER_MODE in ["api", "auto"] and OPENROUTER_API_AVAILABLE:
                     try:
                         print("Attempting to use OpenRouter API with Mistral 7B")
+                        # Check OpenRouter API status first
+                        status = get_openrouter_model_status()
+                        print(f"OpenRouter API status: {status}")
+                        
+                        # Always try to use the OpenRouter API if it's available
+                        print(f"OpenRouter API status: {status}")
+                        print("Proceeding with OpenRouter API resume analysis...")
                         analysis_result = analyze_resume_with_openrouter(resume_text)
                         return analysis_result
                     except ValueError as e:
@@ -340,6 +354,11 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
                             # If user explicitly requested API mode, return the error
                             raise HTTPException(status_code=503, 
                                 detail=f"OpenRouter API analysis failed: {str(e)}. Please check your API key or try again later.")
+                    except Exception as e:
+                        print(f"Unexpected error with OpenRouter API: {str(e)}")
+                        if ANALYZER_MODE == "api":
+                            raise HTTPException(status_code=500,
+                                detail=f"Unexpected error with OpenRouter API: {str(e)}.")
                         
                         # Otherwise in auto mode, try other methods
                         print("Falling back to other analysis methods...")
@@ -402,7 +421,7 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
         print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
-@app.post("/resumes/upload")
+@app.post("/api/resumes/upload")
 async def upload_resume(file: UploadFile = File(...), metadata: str = Form(...)):
     """
     Upload a resume file with metadata
@@ -437,7 +456,7 @@ async def upload_resume(file: UploadFile = File(...), metadata: str = Form(...))
         resume = {
             "id": resume_id,
             "filename": file.filename,
-            "download_url": f"/resumes/{resume_id}/{file.filename}",
+            "download_url": f"/api/resumes/{resume_id}/{file.filename}",
             "upload_date": timestamp,
             "status": "processed",
             "match_score": random.randint(65, 95),
@@ -461,7 +480,7 @@ async def upload_resume(file: UploadFile = File(...), metadata: str = Form(...))
         print(f"Error in upload_resume: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-@app.get("/resumes/user")
+@app.get("/api/resumes/user")
 async def get_user_resumes():
     """
     Get resumes for the current user
@@ -514,7 +533,7 @@ async def get_user_resumes():
             content={"detail": f"Failed to get resumes: {str(e)}"}
         )
 
-@app.post("/resumes/search")
+@app.post("/api/resumes/search")
 async def search_resume(search_query: SearchQuery):
     """
     Search for resumes based on query and filters
@@ -625,7 +644,7 @@ async def search_resume(search_query: SearchQuery):
             content={"detail": f"Resume search failed: {str(e)}"}
         )
 
-@app.get("/resumes")
+@app.get("/api/resumes")
 async def get_all_resumes():
     """
     Get all resumes
@@ -640,7 +659,7 @@ async def get_all_resumes():
             content={"detail": f"Failed to get resumes: {str(e)}"}
         )
 
-@app.get("/resumes/download/{resume_id}")
+@app.get("/api/resumes/download/{resume_id}")
 async def download_resume(resume_id: str):
     """
     Download a resume by ID
@@ -692,7 +711,7 @@ async def download_resume(resume_id: str):
             content={"detail": f"Failed to download resume: {str(e)}"}
         )
 
-@app.delete("/resumes/{resume_id}")
+@app.delete("/api/resumes/{resume_id}")
 async def delete_resume(resume_id: str):
     """
     Delete a resume by ID

@@ -47,33 +47,35 @@ export function UploadForm() {
     const checkModelStatus = async () => {
       setIsLoadingStatus(true);
       try {
-        const response = await fetch('/api/model/status');
-        if (response.ok) {
-          const data = await response.json();
-          setModelStatus(data);
+        // Use the getModelStatus function from the API
+        const status = await getModelStatus();
+        setModelStatus(status);
+        setModelInfo(status); // Set modelInfo with the same data
+        console.log("Model status from API:", status);
+        
+        // Log success for debugging
+        if (status.status === "available") {
+          console.log("✅ OpenRouter API is available and ready to use");
+        } else {
+          console.warn("⚠️ OpenRouter API is not available, using fallback mode:", status.mode);
         }
       } catch (error) {
         console.error('Failed to check model status:', error);
+        // Set default error status
+        const errorStatus = {
+          status: "error",
+          message: "Could not connect to the analysis service",
+          using_fallback: true,
+          mode: "pattern"
+        };
+        setModelStatus(errorStatus);
+        setModelInfo(errorStatus);
       } finally {
         setIsLoadingStatus(false);
       }
     };
     
     checkModelStatus();
-  }, []);
-
-  useEffect(() => {
-    const fetchModelInfo = async () => {
-      try {
-        const info = await getModelStatus();
-        setModelInfo(info);
-        console.log("Model status:", info);
-      } catch (error) {
-        console.error("Failed to fetch model status:", error);
-      }
-    };
-    
-    fetchModelInfo();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
