@@ -1,0 +1,20 @@
+John Smith
+Software Engineer
+
+EXPERIENCE
+Senior Software Engineer at Tech Corp (2018-Present)
+- Developed web applications using React.js and Node.js
+- Implemented CI/CD pipelines using GitHub Actions
+- Optimized database queries resulting in 40% performance improvement
+
+Software Engineer at Code Company (2015-2018)
+- Built RESTful APIs using Node.js and Express
+- Created frontend components with React and Redux
+- Collaborated with UX designers to implement responsive designs
+
+SKILLS
+JavaScript, TypeScript, React.js, Node.js, Express, MongoDB, PostgreSQL, Git, Docker, AWS
+
+EDUCATION
+Bachelor of Science in Computer Science
+Stanford University (2011-2015) 
