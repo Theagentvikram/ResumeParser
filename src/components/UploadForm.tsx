@@ -160,10 +160,18 @@ export function UploadForm() {
       
       // Process the resume - use analyzeUserResume instead of analyzeResume
       // to ensure we're properly sending the file to the backend
+      console.log("Calling analyzeUserResume with file:", file.name);
       const result = await analyzeUserResume(file);
       
       // Log the complete results for debugging
       console.log("Raw analysis result:", JSON.stringify(result, null, 2));
+      console.log("Result type:", typeof result);
+      console.log("Result properties:");
+      console.log("- summary:", result.summary, typeof result.summary);
+      console.log("- skills:", result.skills, Array.isArray(result.skills));
+      console.log("- experience:", result.experience, typeof result.experience);
+      console.log("- educationLevel:", result.educationLevel, typeof result.educationLevel);
+      console.log("- category:", result.category, typeof result.category);
       
       // Ensure minimum 3 seconds of processing time for UX purposes
       const processingTime = Date.now() - startTime;
@@ -194,11 +202,31 @@ export function UploadForm() {
         else if (result.summary.includes("backend")) errorType = "backend";
         
         // Update UI with results
+        console.log("Updating UI with analysis results");
+        console.log("Setting summary to:", result.summary);
         setSummary(result.summary);
-        setSkills(result.skills.filter(s => !s.includes("Error")) || []);
+        
+        console.log("Setting skills to:", result.skills?.filter(s => !s.includes("Error")) || []);
+        setSkills(result.skills?.filter(s => !s.includes("Error")) || []);
+        
+        console.log("Setting experience to:", result.experience?.toString() || "0");
         setExperience(result.experience?.toString() || "0");
+        
+        console.log("Setting educationLevel to:", result.educationLevel || "");
         setEducationLevel(result.educationLevel || "");
+        
+        console.log("Setting category to:", result.category || "");
         setCategory(result.category || "");
+        
+        // Debug check if state is being updated
+        setTimeout(() => {
+          console.log("State after update:");
+          console.log("- summary:", summary);
+          console.log("- skills:", skills);
+          console.log("- experience:", experience);
+          console.log("- educationLevel:", educationLevel);
+          console.log("- category:", category);
+        }, 100);
         
         // Show appropriate notification based on result
         if (hasErrors) {
