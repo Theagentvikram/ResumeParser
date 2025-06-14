@@ -32,9 +32,16 @@ def main():
     # Get the absolute path to the backend directory
     backend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend")
     
-    # Set environment variables
+    # Load .env from project root to ensure correct API key
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    from dotenv import dotenv_values
     env = os.environ.copy()
-    env["ANALYZER_MODE"] = "api"
+    env.update(dotenv_values(os.path.join(project_root, ".env")))
+    key_debug = env.get("OPENROUTER_API_KEY", "not_set")
+    print(f"Loaded key from .env (preview): {key_debug[:10]}...{key_debug[-5:]} ({len(key_debug)} chars)")
+
+    # Explicitly set/override desired variables
+    env["ANALYZER_MODE"] = env.get("ANALYZER_MODE", "api")
     env["PYTHONPATH"] = backend_dir + ":" + env.get("PYTHONPATH", "")
     
     # Change to the backend directory

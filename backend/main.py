@@ -73,7 +73,7 @@ load_dotenv()
 # Get the desired analyzer mode from environment
 ANALYZER_MODE = os.getenv("ANALYZER_MODE", "auto").lower()  # "auto", "api", "offline", "regex", "llama_cpp"
 
-app = FastAPI(title="ResuMatch API", description="API for ResuMatch Resume Selection App")
+app = FastAPI(title="Resume Parser", description="API for Resume Parser App")
 
 # Configure CORS
 app.add_middleware(
