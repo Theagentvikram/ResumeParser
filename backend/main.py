@@ -78,10 +78,15 @@ app = FastAPI(title="Resume Parser", description="API for Resume Parser App")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development. In production, specify domains
+    allow_origins=[
+        "http://localhost:5173",  # Local development
+        "https://resume-6k1adod6v-theagentvikrams-projects.vercel.app",  # Vercel frontend
+        "https://resume-theta-lovat.vercel.app"  # Alternative Vercel URL format
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"]  # For file downloads
 )
 
 # Create storage directory if it doesn't exist
