@@ -12,5 +12,5 @@ supabase==1.0.3
 numpy==1.24.3
 scikit-learn==1.2.2
 transformers==4.29.2
-sentence-transformers==2.2.2 
+sentence-transformers==2.2.2
 llama-cpp-python==0.2.19
