@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useResumes } from "@/contexts/ResumeContext";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,7 +78,7 @@ export function ResumeResults() {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">
-                    {(result.resume.originalName || result.resume.filename || "Unknown Resume").replace(".pdf", "")}
+                    {(result.resume?.originalName || result.resume?.filename || "Unknown Resume").replace(".pdf", "")}
                   </CardTitle>
                   <Badge variant="outline" className={cn("border px-2 py-1 font-medium", getMatchScoreColor(result.matchScore))}>
                     Match Score: {result.matchScore}
@@ -88,11 +87,11 @@ export function ResumeResults() {
               </CardHeader>
               <CardContent className="pb-3">
                 <div className="mb-3">
-                  <p className="text-sm">{result.resume.summary}</p>
+                  <p className="text-sm">{result.resume?.summary || "No summary available."}</p>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {result.resume.skills.map((skill) => (
+                  {(Array.isArray(result.resume?.skills) ? result.resume.skills : []).map((skill) => (
                     <Badge key={skill} variant="outline" className="bg-brand-gray">
                       {skill}
                     </Badge>
@@ -112,11 +111,11 @@ export function ResumeResults() {
               <Separator />
               <CardFooter className="flex justify-between pt-3">
                 <div className="flex items-center text-xs text-muted-foreground">
-                  <span className="font-medium mr-1">Category:</span> {result.resume.category}
+                  <span className="font-medium mr-1">Category:</span> {result.resume?.category || "N/A"}
                   <span className="mx-2">•</span>
-                  <span className="font-medium mr-1">Added:</span> {formatDate(result.resume.uploadDate)}
+                  <span className="font-medium mr-1">Added:</span> {formatDate(result.resume?.uploadDate || new Date().toISOString())}
                   <span className="mx-2">•</span>
-                  <span className="font-medium mr-1">Experience:</span> {result.resume.experience} years
+                  <span className="font-medium mr-1">Experience:</span> {result.resume?.experience || 0} years
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -139,7 +138,7 @@ export function ResumeResults() {
       <Dialog open={!!selectedResume} onOpenChange={(open) => !open && setSelectedResume(null)}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{selectedResume?.originalName.replace(".pdf", "")}</DialogTitle>
+            <DialogTitle>{selectedResume?.originalName?.replace(".pdf", "")}</DialogTitle>
             <DialogDescription>
               Complete resume details and information
             </DialogDescription>
@@ -149,32 +148,32 @@ export function ResumeResults() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium mb-1">Summary</h3>
-                <p className="text-sm">{selectedResume.summary}</p>
+                <p className="text-sm">{selectedResume.summary || "N/A"}</p>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-sm font-medium mb-1">Category</h3>
-                  <p className="text-sm">{selectedResume.category}</p>
+                  <p className="text-sm">{selectedResume.category || "N/A"}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium mb-1">Experience</h3>
-                  <p className="text-sm">{selectedResume.experience} years</p>
+                  <p className="text-sm">{selectedResume.experience || 0} years</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium mb-1">Education</h3>
-                  <p className="text-sm">{selectedResume.educationLevel}</p>
+                  <p className="text-sm">{selectedResume.educationLevel || "N/A"}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium mb-1">Uploaded</h3>
-                  <p className="text-sm">{formatDate(selectedResume.uploadDate)}</p>
+                  <p className="text-sm">{formatDate(selectedResume.uploadDate || new Date().toISOString())}</p>
                 </div>
               </div>
               
               <div>
                 <h3 className="text-sm font-medium mb-1">Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {selectedResume.skills.map((skill) => (
+                  {(Array.isArray(selectedResume.skills) ? selectedResume.skills : []).map((skill) => (
                     <Badge key={skill} variant="outline">
                       {skill}
                     </Badge>
