@@ -78,7 +78,11 @@ app = FastAPI(title="ResuMatch API", description="API for ResuMatch Resume Selec
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development. In production, specify domains
+    allow_origins=[
+        "https://resume-ai-pink-eight.vercel.app",
+        "http://localhost:5173",  # For local development
+        "http://localhost:3000",  # For local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
