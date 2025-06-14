@@ -76,7 +76,7 @@ ANALYZER_MODE = os.getenv("ANALYZER_MODE", "auto").lower()  # "auto", "api", "of
 app = FastAPI(title="Resume Parser", description="API for Resume Parser App")
 
 # Read allowed origins from environment or use default
-origins = os.getenv("ALLOWED_ORIGINS", "https://resume-ai-pink-eight.vercel.app,https://resumatch1.netlify.app,http://localhost:5173").split(",")
+origins = os.getenv("ALLOWED_ORIGINS", "https://resume-ai-pink-eight.vercel.app,https://resumatcher.netlify.app,http://localhost:8000").split(",")
 
 # Clean up whitespace
 origins = [origin.strip() for origin in origins]
