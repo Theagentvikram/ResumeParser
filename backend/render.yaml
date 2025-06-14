@@ -2,9 +2,9 @@ services:
   - type: web
     name: resumatch-backend
     env: python
+    runtime: python3.11
     buildCommand: |
-      python -m pip install --upgrade pip
-      pip install setuptools wheel
+      python -m pip install --upgrade pip setuptools wheel
       pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
