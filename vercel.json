@@ -15,7 +15,7 @@
       "dest": "https://resumeparser-0u79.onrender.com/api/$1"
     },
     {
-      "src": "/(.*)",
+      "src": "^/(.*)$",
       "dest": "/index.html"
     }
   ]
