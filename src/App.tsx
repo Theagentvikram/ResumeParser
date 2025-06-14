@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ResumeProvider } from "@/contexts/ResumeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { logEnvConfig, checkBackendConnection } from "@/utils/debug";
+import { useEffect } from "react";
 
 // Pages
 import Index from "./pages/Index";
@@ -18,17 +20,48 @@ import UploadStatusPage from "./pages/UploadStatusPage";
 import ResumeDetailsPage from "./pages/ResumeDetailsPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+// Global query error handler
+queryClient.getQueryCache().config.onError = (error) => {
+  console.error('React Query Error:', error);
+};
+
+interface DebugWrapperProps {
+  children: React.ReactNode;
+}
+
+const DebugWrapper: React.FC<DebugWrapperProps> = ({ children }) => {
+  useEffect(() => {
+    // Log environment configuration
+    logEnvConfig();
+    
+    // Check backend connection
+    checkBackendConnection().then(isConnected => {
+      console.log(`Backend is ${isConnected ? 'connected' : 'not reachable'}`);
+    });
+  }, []);
+
+  return children;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
         <ResumeProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
+          <DebugWrapper>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<LoginPage />} />
@@ -72,9 +105,10 @@ const App = () => (
               />
               
               {/* 404 Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </DebugWrapper>
         </ResumeProvider>
       </AuthProvider>
     </TooltipProvider>
