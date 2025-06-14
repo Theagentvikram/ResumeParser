@@ -75,10 +75,16 @@ ANALYZER_MODE = os.getenv("ANALYZER_MODE", "auto").lower()  # "auto", "api", "of
 
 app = FastAPI(title="Resume Parser", description="API for Resume Parser App")
 
-# Configure CORS
+# Read allowed origins from environment or use default
+origins = os.getenv("ALLOWED_ORIGINS", "https://resume-ai-pink-eight.vercel.app,https://resumatch1.netlify.app,http://localhost:5173").split(",")
+
+# Clean up whitespace
+origins = [origin.strip() for origin in origins]
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://resume-ai-pink-eight.vercel.app", "http://localhost:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
