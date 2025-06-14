@@ -1,25 +1,12 @@
 services:
   - type: web
     name: resumatch-backend
-    env: python
-    runtime: python3.11
-    buildCommand: |
-      python -m pip install --upgrade pip poetry
-      poetry config virtualenvs.create false
-      poetry install --no-dev
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    env: docker
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
         sync: false
       - key: JWT_SECRET
-        sync: false
-      - key: SUPABASE_URL
-        value: https://wjziwynbpfihumagfiwt.supabase.co
-      - key: SUPABASE_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indqeml3eW5icGZpaHVtYWdmaXd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4OTA2NTgsImV4cCI6MjA2NTQ2NjY1OH0.lo56nk7p-vDdqeunIMyOaj4OUKjYBLPFF_tDv2xj764
-      - key: JWT_SECRET
-        value: biQ0fBG9Cmg883jagL8BwMw1cF4EPR7CGfglqpOscJk= 
+        sync: false 
