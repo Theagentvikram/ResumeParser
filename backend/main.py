@@ -17,17 +17,20 @@ import random
 
 # Import services
 try:
-    from services.pdf_service import extract_text_from_pdf
+    from services.pdf_service import extract_text_from_pdf, extract_with_pdfplumber
 except ImportError:
     # Create a fallback if PyMuPDF is not installed
     def extract_text_from_pdf(file_path):
         return "This is mock text extracted from a PDF. PyMuPDF (fitz) is not installed."
+    def extract_with_pdfplumber(file_path):
+        return "This is mock text extracted from a PDF. pdfplumber is not installed."
 
 from services.llm_service import get_resume_summary
 from services.embedding_service import get_embedding, calculate_similarity
 from services.storage_service import upload_to_storage, get_download_url, LOCAL_STORAGE_DIR
 from services.database_service import save_resume_to_db, get_resumes, search_resumes
 from services.claude_service import analyze_resume_with_regex
+from services.openrouter_service import get_relevance_score_with_openrouter
 
 # Import OpenRouter service for Mistral 7B
 try:
@@ -91,8 +94,28 @@ app.add_middleware(
 # Create storage directory if it doesn't exist
 os.makedirs(LOCAL_STORAGE_DIR, exist_ok=True)
 
-# User resumes storage (in-memory for demo)
-USER_RESUMES = []
+# Resume storage file path
+RESUMES_FILE = Path("./storage/resumes.json")
+
+# Initialize resumes from file if it exists
+def load_resumes():
+    if RESUMES_FILE.exists():
+        try:
+            with open(RESUMES_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading resumes: {str(e)}")
+    return []
+
+def save_resumes(resumes):
+    try:
+        with open(RESUMES_FILE, 'w') as f:
+            json.dump(resumes, f, indent=2)
+    except Exception as e:
+        print(f"Error saving resumes: {str(e)}")
+
+# Load existing resumes
+USER_RESUMES = load_resumes()
 
 class ResumeAnalysisResponse(BaseModel):
     skills: List[str]
@@ -308,7 +331,6 @@ async def analyze_resume(file: Optional[UploadFile] = File(None), text: Optional
                         # If text extraction failed, let's try the other method directly
                         if not resume_text or len(resume_text.strip()) < 100:
                             print("Primary extraction yielded too little text, trying fallback method...")
-                            from services.pdf_service import extract_with_pdfplumber
                             resume_text = extract_with_pdfplumber(temp_file_path)
                             print(f"Fallback extracted text length: {len(resume_text)} characters")
                             print(f"Fallback text sample: {resume_text[:200].replace(chr(10), ' ')}")
@@ -488,7 +510,7 @@ async def upload_resume(file: UploadFile = File(...), metadata: str = Form(...))
         resume = {
             "id": resume_id,
             "filename": file.filename,
-            "download_url": f"/api/resumes/{resume_id}/{file.filename}",
+            "download_url": f"/api/resumes/download/{resume_id}",
             "upload_date": timestamp,
             "status": "processed",
             "match_score": random.randint(65, 95),
@@ -496,14 +518,16 @@ async def upload_resume(file: UploadFile = File(...), metadata: str = Form(...))
             "skills": meta_dict.get("skills", []),
             "experience": meta_dict.get("experience", ""),
             "educationLevel": meta_dict.get("educationLevel", ""),
-            "category": meta_dict.get("category", "")
+            "category": meta_dict.get("category", ""),
+            "file_path": str(file_path)
         }
         
-        # Add to our in-memory storage
+        # Add to our storage and save to file
         USER_RESUMES.append(resume)
+        save_resumes(USER_RESUMES)
         
         # Print the current resumes for debugging
-        print(f"Current resumes in memory: {len(USER_RESUMES)}")
+        print(f"Current resumes in storage: {len(USER_RESUMES)}")
         for r in USER_RESUMES:
             print(f"  - {r['id']}: {r['filename']}")
         
@@ -518,8 +542,12 @@ async def get_user_resumes():
     Get resumes for the current user
     """
     try:
+        # Reload resumes from file to ensure we have the latest data
+        global USER_RESUMES
+        USER_RESUMES = load_resumes()
+        
         # Print the current resumes for debugging
-        print(f"Returning {len(USER_RESUMES)} resumes from memory")
+        print(f"Returning {len(USER_RESUMES)} resumes from storage")
         for r in USER_RESUMES:
             print(f"  - {r['id']}: {r['filename']}")
             
@@ -556,6 +584,7 @@ async def get_user_resumes():
                 }
             ]
             USER_RESUMES.extend(mock_resumes)
+            save_resumes(USER_RESUMES)
             
         return USER_RESUMES
     except Exception as e:
@@ -573,68 +602,14 @@ async def search_resume(search_query: SearchQuery):
     try:
         print(f"Received search query: {search_query.query}")
         
-        # Get embedding for the query (or mock embedding)
-        try:
-            query_embedding = await get_embedding(search_query.query)
-        except Exception as e:
-            print(f"Warning: Using mock embeddings. {str(e)}")
-            # Mock embedding (random vector)
-            query_embedding = [random.random() for _ in range(384)]
-        
-        # First try to search through actual user resumes
-        if USER_RESUMES and len(USER_RESUMES) > 0:
-            print(f"Searching through {len(USER_RESUMES)} user resumes")
-            # Simple keyword matching for now
-            keywords = search_query.query.lower().split()
-            results = []
-            
-            for resume in USER_RESUMES:
-                # Calculate a simple match score based on keyword presence
-                score = 0
-                match_reason = []
-                
-                # Check summary
-                if "summary" in resume and resume["summary"]:
-                    summary = resume["summary"].lower()
-                    for keyword in keywords:
-                        if keyword in summary:
-                            score += 10
-                            match_reason.append(f"Keyword '{keyword}' found in summary")
-                
-                # Check skills
-                if "skills" in resume and resume["skills"]:
-                    for skill in resume["skills"]:
-                        for keyword in keywords:
-                            if keyword in skill.lower():
-                                score += 15
-                                match_reason.append(f"Skill '{skill}' matches search term")
-                
-                # If we have a match, add to results
-                if score > 0:
-                    result = resume.copy()  # Make a copy to avoid modifying original
-                    result["match_score"] = min(score, 100)  # Cap at 100
-                    result["match_reason"] = ". ".join(match_reason)
-                    results.append(result)
-            
-            # Sort by match score
-            results.sort(key=lambda x: x.get("match_score", 0), reverse=True)
-            
-            if results:
-                print(f"Found {len(results)} matching resumes")
-                return results
-            else:
-                print("No matches found in user resumes, using mock data")
-        else:
-            print("No user resumes found, using mock data")
-        
         # If no results or no user resumes, return mock data
-        mock_results = [
+        mock_results_data = [
             {
                 "id": str(uuid.uuid4()),
                 "filename": "candidate1.pdf",
                 "upload_date": datetime.now().isoformat(),
                 "match_score": 92,
-                "match_reason": "Strong match on Python, JavaScript skills and experience level",
+                "match_reason": "Strong match on Python, JavaScript skills and experience level (Mock Data)",
                 "summary": "Software engineer with 6 years of experience in Python and JavaScript.",
                 "skills": ["Python", "JavaScript", "React", "Django", "AWS"],
                 "experience": "6",
@@ -646,7 +621,7 @@ async def search_resume(search_query: SearchQuery):
                 "filename": "candidate2.pdf",
                 "upload_date": datetime.now().isoformat(),
                 "match_score": 85,
-                "match_reason": "Good match on frontend skills and web development experience",
+                "match_reason": "Good match on frontend skills and web development experience (Mock Data)",
                 "summary": "Front-end developer with 4 years of experience creating responsive web applications.",
                 "skills": ["JavaScript", "React", "CSS", "HTML", "TypeScript"],
                 "experience": "4",
@@ -658,7 +633,7 @@ async def search_resume(search_query: SearchQuery):
                 "filename": "candidate3.pdf",
                 "upload_date": datetime.now().isoformat(),
                 "match_score": 78,
-                "match_reason": "Matches on full-stack development and cloud experience",
+                "match_reason": "Matches on full-stack development and cloud experience (Mock Data)",
                 "summary": "Full-stack developer with expertise in MERN stack and cloud services.",
                 "skills": ["MongoDB", "Express", "React", "Node.js", "AWS"],
                 "experience": "3",
@@ -667,8 +642,66 @@ async def search_resume(search_query: SearchQuery):
             }
         ]
         
-        print("Returning mock search results")
-        return mock_results
+        if USER_RESUMES and len(USER_RESUMES) > 0:
+            print(f"Searching through {len(USER_RESUMES)} user resumes")
+            
+            results = []
+            for resume in USER_RESUMES:
+                resume_content = ""
+                # Try to extract text from PDF or TXT, falling back if needed
+                if resume.get("file_path"):
+                    try:
+                        file_extension = Path(resume["file_path"]).suffix.lower()
+                        if file_extension == ".pdf":
+                            resume_content = extract_text_from_pdf(resume["file_path"])
+                            if not resume_content or len(resume_content.strip()) < 100:
+                                print(f"Warning: Primary PDF extraction failed for {resume['filename']}. Trying pdfplumber fallback.")
+                                resume_content = extract_with_pdfplumber(resume["file_path"])
+                        elif file_extension == ".txt":
+                            with open(resume["file_path"], "r") as f:
+                                resume_content = f.read()
+                        else:
+                            print(f"Warning: Unsupported file format for {resume['filename']}. Skipping LLM scoring.")
+                            llm_score_result = {"score": 0, "reason": "Unsupported file format for LLM analysis.", "source": "unsupported_format_fallback"}
+
+                        if resume_content and len(resume_content.strip()) >= 50: # Minimum content length to attempt LLM scoring
+                            # Get LLM-based relevance score
+                            print(f"Getting LLM relevance score for {resume['filename']} with query: {search_query.query[:50]}...")
+                            llm_score_result = await get_relevance_score_with_openrouter(
+                                job_query=search_query.query,
+                                resume_text=resume_content
+                            )
+                            llm_score_result["source"] = llm_score_result.get("source", "openrouter_llm")
+                        else:
+                            print(f"Warning: Not enough content extracted from {resume['filename']}. Using mock score.")
+                            llm_score_result = {"score": random.randint(30, 60), "reason": "Insufficient resume content for LLM analysis.", "source": "mock_content_fallback"}
+
+                    except Exception as e:
+                        print(f"Error processing resume {resume.get('filename', '')}: {str(e)}. Using mock score.")
+                        llm_score_result = {"score": random.randint(30, 60), "reason": f"Error during LLM analysis: {str(e)}", "source": "llm_error_fallback"}
+                else:
+                    print(f"No file_path for {resume.get('filename', '')}. Using mock score.")
+                    llm_score_result = {"score": random.randint(20, 50), "reason": "Resume file path missing.", "source": "no_file_path_fallback"}
+
+                result = resume.copy()
+                result["match_score"] = llm_score_result["score"]
+                result["match_reason"] = llm_score_result["reason"]
+                result["score_source"] = llm_score_result["source"]
+                results.append(result)
+            
+            # Sort by match score
+            results.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+            
+            if results:
+                print(f"Found {len(results)} matching resumes using LLM scoring")
+                return results
+            else:
+                print("No matches found after LLM scoring attempts, returning mock data.")
+                return mock_results_data # Fallback if LLM scoring yielded no relevant results
+        else:
+            print("No user resumes found, returning mock data.")
+            return mock_results_data
+
     except Exception as e:
         print(f"Error in search_resume: {str(e)}")
         return JSONResponse(
@@ -750,7 +783,18 @@ async def delete_resume(resume_id: str):
     """
     try:
         global USER_RESUMES
-        USER_RESUMES = [r for r in USER_RESUMES if r["id"] != resume_id]
+        # Find the resume to delete
+        resume_to_delete = next((r for r in USER_RESUMES if r["id"] == resume_id), None)
+        if resume_to_delete:
+            # Delete the file if it exists
+            file_path = Path(resume_to_delete.get("file_path", ""))
+            if file_path.exists():
+                file_path.unlink()
+            
+            # Remove from storage
+            USER_RESUMES = [r for r in USER_RESUMES if r["id"] != resume_id]
+            save_resumes(USER_RESUMES)
+            
         return {"status": "success", "message": f"Resume {resume_id} deleted successfully"}
     except Exception as e:
         print(f"Error in delete_resume: {str(e)}")

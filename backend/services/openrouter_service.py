@@ -5,18 +5,22 @@ import logging
 import re
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
+import random
+import httpx
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables with force reload
-load_dotenv(override=True)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=True)
 
 # OpenRouter API settings - load from environment but with fallbacks
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
+OPENROUTER_CHAT_COMPLETIONS_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL_NAME = os.getenv("OPENROUTER_MODEL_NAME", "mistralai/mistral-7b-instruct:free")
 
 # Print the API key for debugging (first 10 chars and last 5 chars only for security)
 logger.info(f"Loaded OpenRouter API key: {OPENROUTER_API_KEY[:10]}...{OPENROUTER_API_KEY[-5:]}")
@@ -460,3 +464,87 @@ def get_openrouter_model_status(fallback_to_mock: bool = True) -> Dict[str, Any]
                 "using_fallback": False,
                 "mode": "error"
             }
+
+async def get_relevance_score_with_openrouter(
+    job_query: str,
+    resume_text: str, # Use full resume text for better context
+    fallback_to_mock: bool = True
+) -> Dict[str, Any]:
+    """
+    Gets a relevance score for a resume against a job query using OpenRouter API.
+    Returns a dictionary with 'score' (int) and 'reason' (str).
+    """
+    logger.info("Attempting to get relevance score using OpenRouter API")
+    if not OPENROUTER_API_KEY:
+        logger.warning("No OpenRouter API key found for scoring. Using mock score.")
+        logger.info(f"OPENROUTER_API_KEY value at time of check: '{OPENROUTER_API_KEY}'")
+        return generate_mock_score()
+
+    try:
+        client = httpx.AsyncClient(timeout=30.0) # Increased timeout for potentially longer LLM responses
+        prompt_messages = [
+            {"role": "system", "content": """You are an expert recruitment AI. Your task is to objectively assess the relevance of a candidate's resume to a specific job description. Provide a precise numerical score from 0 to 100 based on the match. Your score should reflect how well the candidate's skills, experience, and education align with the job requirements.
+
+Be highly critical, precise, and use the full range of the 0-100 scale to clearly differentiate between excellent, good, average, and poor matches. Do not inflate scores. Provide a concise, specific reason for the score, highlighting concrete strengths and weaknesses relevant to the job.
+
+Output only a JSON object with "score" (integer) and "reason" (string) keys."""},
+            {"role": "user", "content": f"""
+            Job Description: {job_query}
+            
+            Resume Text: {resume_text[:4000]}
+            
+            Based on the above, provide a relevance score (0-100) and a concise reason. Example: {{ "score": 85, "reason": "Strong alignment with required skills and experience in X, Y, Z." }}
+            """}
+        ]
+
+        response = await client.post(
+            OPENROUTER_CHAT_COMPLETIONS_API_URL,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://github.com/theagentvikram/ResuMatch",
+                "X-Title": "ResuMatch",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": OPENROUTER_MODEL_NAME,
+                "messages": prompt_messages,
+                "response_format": {"type": "json_object"},
+                "max_tokens": 200 # Slightly increased max_tokens for more detailed reasons
+            }
+        )
+
+        if response.status_code == 200:
+            response_json = response.json()
+            generated_text = response_json["choices"][0]["message"]["content"]
+            
+            try:
+                parsed_result = json.loads(generated_text)
+                score = parsed_result.get("score", 0)
+                reason = parsed_result.get("reason", "No reason provided by LLM.")
+                score = max(0, min(100, int(score))) # Ensure score is an int and within bounds
+                return {"score": score, "reason": reason}
+            except json.JSONDecodeError as json_err:
+                logger.error(f"JSON parsing error for relevance score: {json_err}. Raw: {generated_text}")
+                if fallback_to_mock:
+                    return generate_mock_score()
+                else:
+                    raise ValueError(f"Failed to parse LLM score response: {json_err}")
+        else:
+            logger.error(f"OpenRouter API error for scoring ({response.status_code}): {response.text}")
+            if fallback_to_mock:
+                return generate_mock_score()
+            else:
+                raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
+
+    except Exception as e:
+        logger.error(f"Error getting relevance score from OpenRouter: {str(e)}")
+        if fallback_to_mock:
+            return generate_mock_score()
+        else:
+            raise
+
+def generate_mock_score() -> Dict[str, Any]:
+    """
+    Generates a mock score and reason.
+    """
+    return {"score": random.randint(50, 99), "reason": "Mock score: LLM API not available or failed."}

@@ -4,14 +4,18 @@ import requests
 from typing import List, Dict, Any
 import httpx
 from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
 
-# Get HF API token from environment
-HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
-HF_EMBEDDING_API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
+# Load environment variables
+load_dotenv()
+
+# Get OpenRouter API token from environment
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_EMBEDDING_API_URL = "https://openrouter.ai/api/v1/embeddings"
 
 async def get_embedding(text: str) -> List[float]:
     """
-    Get embedding vector for a piece of text using Hugging Face API
+    Get embedding vector for a piece of text using OpenRouter API with Mistral Instruct model
     
     Args:
         text: The text to embed
@@ -20,36 +24,43 @@ async def get_embedding(text: str) -> List[float]:
         List of floats representing the embedding vector
     """
     try:
-        if HF_API_KEY:
+        if OPENROUTER_API_KEY:
             # Use the API to get embeddings
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    HF_EMBEDDING_API_URL,
-                    headers={"Authorization": f"Bearer {HF_API_KEY}"},
-                    json={"inputs": text[:2000]}  # Truncate to avoid token limits
+                    OPENROUTER_EMBEDDING_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "HTTP-Referer": "https://github.com/theagentvikram/ResuMatch",  # Required by OpenRouter
+                        "X-Title": "ResuMatch"  # Optional but helpful for OpenRouter
+                    },
+                    json={
+                        "model": "mistralai/mistral-7b-instruct:free",  # Using free version of Mistral Instruct
+                        "input": text[:2000]  # Truncate to avoid token limits
+                    }
                 )
                 
                 if response.status_code == 200:
                     # API returns a list of embeddings, we just need the first one
-                    embedding = response.json()[0]
+                    embedding = response.json()["data"][0]["embedding"]
                     return embedding
                 else:
-                    print(f"Error from HF API: {response.text}")
+                    print(f"Error from OpenRouter API: {response.text}")
                     # Fall back to mock embeddings
                     return generate_mock_embedding()
         else:
-            print("WARNING: No HF API key found. Using mock embeddings.")
+            print("WARNING: No OpenRouter API key found. Using mock embeddings.")
             return generate_mock_embedding()
     except Exception as e:
         print(f"Error generating embedding: {str(e)}")
         return generate_mock_embedding()
 
-def generate_mock_embedding(dimension: int = 384) -> List[float]:
+def generate_mock_embedding(dimension: int = 4096) -> List[float]:
     """
     Generate a mock embedding for testing when API is not available
     
     Args:
-        dimension: Embedding dimension (default 384 for all-MiniLM-L6-v2)
+        dimension: Embedding dimension (default 4096 for Mistral)
         
     Returns:
         Mock embedding vector of specified dimension
