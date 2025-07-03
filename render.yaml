@@ -2,7 +2,7 @@ services:
   - type: web
     name: resumatch-backend
     env: docker
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     envVars:
       - key: SUPABASE_URL
         sync: false
