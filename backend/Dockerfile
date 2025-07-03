@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip and install build dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
