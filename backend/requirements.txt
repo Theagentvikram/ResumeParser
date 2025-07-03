@@ -14,5 +14,3 @@ scikit-learn==1.2.2
 transformers==4.29.2
 sentence-transformers==2.2.2
 llama-cpp-python==0.2.19
-setuptools>=65.5.1
-wheel>=0.38.4
